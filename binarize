@@ -1,0 +1,100 @@
+#!/usr/bin/env python3
+
+__author__ = "Nicholas H.R. Sims"
+__version__ = "1.0"
+
+import base64, cv2, os, numpy, sys
+
+from logger import Logger
+from threading import Thread
+from time import sleep
+
+# Import custom queue
+from concurrent_queue import ConcurrentQueue as Queue
+
+log = Logger(3)
+
+finished_extracting = False
+finished_filtering = False
+
+
+def main():
+
+    try:
+        _, filename = sys.argv
+    except:
+        log.error("FATAL ERROR", "Incorrect number of arguments")
+        return
+
+    count = 0
+    maxFrames = 72
+    color_buffer = Queue()
+    greyscale_buffer = Queue()
+    video_capture = cv2.VideoCapture(filename)
+
+    threads = [
+        Thread(
+            name="EXTRACT",
+            target=extract,
+            args=[video_capture, maxFrames, color_buffer],
+        ),
+        Thread(name="FILTER", target=binarize, args=[color_buffer, greyscale_buffer]),
+        Thread(name="RENDER", target=render, args=[greyscale_buffer]),
+    ]
+    [t.start() for t in threads]
+    [t.join() for t in threads]
+
+
+def extract(input_stream, maxFrames, output_buffer):
+    global finished_extracting
+
+    count = 0
+    while (
+        (data := input_stream.read()) and data[0] and (count := count + 1) <= maxFrames
+    ):
+        status, image = data
+        output_buffer.put(image)
+        log.info("EXTACT", f"Count({count})")
+
+    finished_extracting = True
+    output_buffer.put(None)
+
+
+def binarize(input_buffer, output_buffer):
+    global finished_extracting
+    global finished_filtering
+
+    while not (input_buffer.is_empty() and finished_extracting):
+
+        colored_frame = input_buffer.get()
+        if colored_frame is None:
+            continue
+
+        binarized_frame = cv2.cvtColor(colored_frame, cv2.COLOR_BGR2GRAY)
+        output_buffer.put(binarized_frame)
+
+    finished_filtering = True
+    output_buffer.put(None)
+
+
+def render(input_buffer):
+    global finished_filtering
+
+    sleep(0.05)
+    log.info("RENDER", "start")
+    while not (input_buffer.is_empty() and finished_filtering):
+
+        frame = input_buffer.get()
+        if frame is None:
+            continue
+
+        cv2.imshow("Video", frame)
+        if cv2.waitKey(42) and 0xFF == ord("q"):
+            break
+
+    cv2.destroyAllWindows()
+    log.info("RENDER", "end")
+
+
+if __name__ == "__main__":
+    main()
