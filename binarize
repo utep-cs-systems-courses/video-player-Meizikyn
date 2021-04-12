@@ -12,7 +12,7 @@ from time import sleep
 # Import custom queue
 from concurrent_queue import ConcurrentQueue as Queue
 
-log = Logger(3)
+log = Logger(1)
 
 finished_extracting = False
 finished_filtering = False
