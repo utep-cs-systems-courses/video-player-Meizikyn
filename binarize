@@ -33,13 +33,9 @@ def main():
     video_capture = cv2.VideoCapture(filename)
 
     threads = [
-        Thread(
-            name="EXTRACT",
-            target=extract,
-            args=[video_capture, maxFrames, color_buffer],
-        ),
-        Thread(name="FILTER", target=binarize, args=[color_buffer, greyscale_buffer]),
-        Thread(name="RENDER", target=render, args=[greyscale_buffer]),
+        Thread(target=extract, args=[video_capture, maxFrames, color_buffer],),
+        Thread(target=binarize, args=[color_buffer, greyscale_buffer]),
+        Thread(target=render, args=[greyscale_buffer]),
     ]
     [t.start() for t in threads]
     [t.join() for t in threads]
